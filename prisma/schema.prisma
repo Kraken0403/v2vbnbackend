@@ -1,0 +1,417 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+/**
+ * =========================
+ * ENUMS
+ * =========================
+ */
+
+enum global_role {
+  SUPER_ADMIN
+  ADMIN
+  STAFF
+  MEMBER
+}
+
+enum referral_type {
+  INSIDE
+  OUTSIDE
+}
+
+enum chapter_role_type {
+  PRESIDENT
+  VP
+  ST
+  MENTOR
+  CORE
+  ATTENDANCE_COORDINATOR
+  MEMBER_GROWTH_COORDINATOR
+  APPLICATION_REVIEW_COORDINATOR
+  RETENTION_COORDINATOR
+  POLICY_PROCEDURE_COORDINATOR
+  F2F_COORDINATOR
+  REFERRAL_CHECK_COORDINATOR
+  APPRECIATION_NOTE_COORDINATOR
+  MENTOR_COORDINATOR
+  LEAD_VISITOR_HOST
+  SPOTLIGHT_COORDINATOR
+  KYM_COORDINATOR
+  KNOWLEDGE_SLOT_COORDINATOR
+  MEDIA_HOST_COORDINATOR
+  SOCIAL_MEDIA_COORDINATOR
+  EVENTS_COORDINATOR
+  TRAINING_COORDINATOR
+  APPLICATION_COORDINATOR
+  SPECIFIC_ASK_COORDINATOR
+  I_COMMIT_COORDINATOR
+}
+
+
+
+enum attendance_status {
+  PRESENT
+  ABSENT
+  SUBSTITUTE
+  MEDICAL
+  LATE
+}
+
+enum activity_type {
+  F2F
+  REFERRAL
+  APPRECIATION
+}
+
+enum meeting_status {
+  OPEN
+  CLOSED
+}
+
+
+/**
+ * =========================
+ * CHAPTERS
+ * =========================
+ */
+model chapter {
+  id   Int     @id @default(autoincrement())
+  name String
+  slug String  @unique
+  city String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  member_links      member_chapter[]
+  meetings          meeting[]
+  activity_chapters activity_chapter[]
+  qr_rotation       qr_rotation?
+
+  @@map("chapters")
+}
+
+/**
+ * =========================
+ * USERS (GLOBAL / LT ONLY)
+ * =========================
+ */
+model user {
+  id        Int         @id @default(autoincrement())
+  name      String
+  phone     String      @unique
+  email     String?     @unique
+  password  String
+  role      global_role
+  is_active Boolean     @default(true)
+
+  reset_token        String?
+  reset_token_expiry DateTime?
+
+  // ✅ Link to member (optional)
+  member member?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("users")
+}
+
+model member {
+  id Int @id @default(autoincrement())
+
+  // ✅ login link (optional)
+  user_id Int?  @unique
+  user    user? @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  full_name String
+  slug      String @unique
+
+  // ✅ new fields
+  salutation String?
+  birth_date DateTime?
+
+  membership_number   String?
+  membership_category String?
+
+  company_name String?
+  designation  String?
+  category     String?
+  industry     String?
+  city         String?
+  state        String?
+
+  phone String?
+  email String?
+
+  is_active Boolean @default(true)
+
+  // ✅ 1-1 modules
+  profile         member_profile?
+  contact         member_contact?
+  seating_members meeting_seating_member[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  chapters        member_chapter[]
+  activities_from activity[]           @relation("fromMember")
+  activities_to   activity[]           @relation("toMember")
+  meeting_rows    meeting_member_row[]
+
+  @@map("members")
+}
+
+model member_profile {
+  member_id            Int     @id
+  photo_url            String?
+  headline             String?
+  about                String?
+  business_description String?
+  website              String?
+  linkedin             String?
+  x_handle             String?
+  instagram            String?
+  facebook             String?
+  youtube              String?
+  show_email           Boolean @default(false)
+  show_phone           Boolean @default(false)
+
+  company_address Json?
+  gst_number      String?
+
+  member member @relation(fields: [member_id], references: [id], onDelete: Cascade)
+
+  @@map("member_profiles")
+}
+
+model member_contact {
+  member_id Int @id
+
+  office_email   String?
+  personal_email String?
+
+  company_phone   String?
+  residence_phone String?
+
+  company_address   Json?
+  residence_address Json?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  member member @relation(fields: [member_id], references: [id], onDelete: Cascade)
+
+  @@map("member_contacts")
+}
+
+/**
+ * =========================
+ * MEMBER ↔ CHAPTER (PIVOT)
+ * =========================
+ */
+model member_chapter {
+  id         Int @id @default(autoincrement())
+  member_id  Int
+  chapter_id Int
+
+  joined_at DateTime @default(now())
+  is_active Boolean  @default(true)
+
+  member  member         @relation(fields: [member_id], references: [id])
+  chapter chapter        @relation(fields: [chapter_id], references: [id])
+  roles   chapter_role[]
+
+  @@unique([member_id, chapter_id])
+  @@index([chapter_id])
+  @@map("member_chapters")
+}
+
+/**
+ * =========================
+ * CHAPTER ROLES
+ * =========================
+ */
+model chapter_role {
+  id                Int               @id @default(autoincrement())
+  member_chapter_id Int
+  role              chapter_role_type
+
+  member_chapter member_chapter @relation(fields: [member_chapter_id], references: [id])
+
+  @@unique([member_chapter_id, role])
+  @@map("chapter_roles")
+}
+
+/**
+ * =========================
+ * MEETINGS
+ * =========================
+ */
+model meeting {
+  id         Int     @id @default(autoincrement())
+  chapter_id Int
+  chapter    chapter @relation(fields: [chapter_id], references: [id])
+
+  title      String
+  meeting_at DateTime
+
+  venue    String?
+  map_link String?
+
+  status    meeting_status @default(OPEN)
+  closed_at DateTime?
+
+  created_by Int?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  rows    meeting_member_row[]
+  seating meeting_seating?
+
+  @@index([chapter_id, meeting_at])
+  @@map("meetings")
+}
+
+/**
+ * =========================
+ * MEETING MEMBER ROWS
+ * =========================
+ */
+model meeting_member_row {
+  id         Int @id @default(autoincrement())
+  meeting_id Int
+  member_id  Int
+
+  meeting meeting @relation(fields: [meeting_id], references: [id])
+  member  member  @relation(fields: [member_id], references: [id])
+
+  seat_row    String?
+  seat_column String?
+
+  status          attendance_status @default(PRESENT)
+  substitute_name String?
+
+  is_auto_generated Boolean @default(true)
+  marked_by_member_id Int?
+  marked_by_role chapter_role_type?
+  marked_at DateTime?
+
+  specific_ask  String?
+  specific_give String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@unique([meeting_id, member_id])
+  @@index([meeting_id])
+  @@index([member_id])
+  @@map("meeting_member_rows")
+}
+
+
+/**
+ * =========================
+ * ACTIVITIES (CORE FEATURE)
+ * =========================
+ */
+model activity {
+  id   Int           @id @default(autoincrement())
+  type activity_type
+
+  from_member_id Int
+  to_member_id   Int?
+
+  amount Decimal? @db.Decimal(10, 2)
+  note   String?
+
+  meeting_id Int?
+
+  referral_type  referral_type?
+  referral_name  String?
+  referral_phone String?
+  hotness        Int?
+
+  f2f_location   String?
+  f2f_discussion String?
+
+  created_at DateTime @default(now())
+
+  from_member member  @relation("fromMember", fields: [from_member_id], references: [id])
+  to_member   member? @relation("toMember", fields: [to_member_id], references: [id])
+
+  activity_chapters activity_chapter[]
+
+  @@index([from_member_id])
+  @@index([to_member_id])
+  @@map("activities")
+}
+
+model activity_chapter {
+  id          Int @id @default(autoincrement())
+  activity_id Int
+  chapter_id  Int
+
+  activity activity @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+  chapter  chapter  @relation(fields: [chapter_id], references: [id], onDelete: Cascade)
+
+  @@unique([activity_id, chapter_id])
+  @@index([chapter_id])
+  @@map("activity_chapters")
+}
+
+/**
+ * =========================
+ * QR ROTATION
+ * =========================
+ */
+model qr_rotation {
+  id             Int @id @default(autoincrement())
+  chapter_id     Int @unique
+  secret_version Int @default(1)
+
+  chapter chapter @relation(fields: [chapter_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("qr_rotations")
+}
+
+/**
+ * =========================
+ * MEETING SEATING ORDER
+ * =========================
+ */
+model meeting_seating {
+  id         Int     @id @default(autoincrement())
+  meeting_id Int     @unique
+  meeting    meeting @relation(fields: [meeting_id], references: [id], onDelete: Cascade)
+
+  uploaded_by Int?
+  created_at  DateTime @default(now())
+
+  members meeting_seating_member[]
+
+  @@map("meeting_seatings")
+}
+
+model meeting_seating_member {
+  id                 Int @id @default(autoincrement())
+  meeting_seating_id Int
+  member_id          Int
+  sequence_number    Int
+
+  meeting_seating meeting_seating @relation(fields: [meeting_seating_id], references: [id], onDelete: Cascade)
+  member          member          @relation(fields: [member_id], references: [id])
+
+  @@unique([meeting_seating_id, member_id])
+  @@index([meeting_seating_id, sequence_number])
+  @@map("meeting_seating_members")
+}

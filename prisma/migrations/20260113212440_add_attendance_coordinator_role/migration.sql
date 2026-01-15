@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `chapter_roles` MODIFY `role` ENUM('PRESIDENT', 'VP', 'ST', 'MENTOR', 'CORE', 'ATTENDANCE_COORDINATOR') NOT NULL;

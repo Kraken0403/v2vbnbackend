@@ -15,7 +15,13 @@ export class PublicController {
         name: true,
         city: true,
         member_links: {
-          where: { is_active: true },
+          where: {
+            is_active: true,
+            member: { is_active: true },
+          },
+          orderBy: {
+            member: { full_name: 'asc' },
+          },
           select: {
             member: {
               select: {

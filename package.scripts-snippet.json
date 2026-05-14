@@ -1,0 +1,12 @@
+{
+  "scripts_to_add_or_confirm": {
+    "roster:sync:shrinathji": "tsx scripts/sync-shrinathji-roster.ts",
+    "roster:sync:shrinathji:dry": "tsx scripts/sync-shrinathji-roster.ts --dry-run",
+    "roster:sync:shrinathji:strict": "tsx scripts/sync-shrinathji-roster.ts --strict-ppt",
+    "roster:list:shrinathji": "tsx scripts/list-shrinathji-member-ids.ts",
+    "import:shrinathji": "tsx scripts/import-shrinathji-members.ts"
+  },
+  "dev_dependency_needed": {
+    "tsx": "^4.21.0"
+  }
+}

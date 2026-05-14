@@ -70,13 +70,11 @@ export async function runShrinathjiRosterSync(syncOptions: SyncOptions = {}) {
 
   const duplicateNames = new Set<string>()
   const seenNames = new Set<string>()
-
   for (const row of SHRINATHJI_ROSTER) {
     const key = normalizeName(row.fullName)
     if (seenNames.has(key)) duplicateNames.add(row.fullName)
     seenNames.add(key)
   }
-
   if (duplicateNames.size) {
     throw new Error(`Duplicate roster names found: ${Array.from(duplicateNames).join(', ')}`)
   }
@@ -110,7 +108,6 @@ export async function runShrinathjiRosterSync(syncOptions: SyncOptions = {}) {
   }
 
   const touchedLinkIds = new Set<number>()
-
   const stats = {
     created: 0,
     updated: 0,
@@ -122,10 +119,8 @@ export async function runShrinathjiRosterSync(syncOptions: SyncOptions = {}) {
 
   for (const row of SHRINATHJI_ROSTER) {
     const keys = rosterKeys(row)
-
     let existingLink: ExistingChapterLink | null =
       keys.map((key) => linkByName.get(key)).find((link): link is ExistingChapterLink => Boolean(link)) ?? null
-
     let member = existingLink?.member ?? null
 
     if (!member && row.email) {
@@ -148,31 +143,28 @@ export async function runShrinathjiRosterSync(syncOptions: SyncOptions = {}) {
       is_active: true,
     }
 
-    // PPT does not contain emails. We only write email when supplied.
+    // PPT does not contain emails. We only write email when the old Excel already had one,
+    // so existing manually-added emails are not wiped for newly-added PPT members.
     if (nullable(row.email)) {
       memberData.email = nullable(row.email)
     }
 
     if (member) {
       console.log(`🔁 Updating member: ${row.fullName}`)
-
       if (!finalOptions.dryRun) {
         member = await prisma.member.update({
           where: { id: member.id },
           data: memberData,
         })
       }
-
       stats.updated++
     } else {
       console.log(`➕ Creating member: ${row.fullName}`)
-
       if (!finalOptions.dryRun) {
         member = await prisma.member.create({ data: memberData })
       } else {
         member = { id: -row.slide, ...memberData, user_id: null } as any
       }
-
       stats.created++
     }
 
@@ -192,19 +184,16 @@ export async function runShrinathjiRosterSync(syncOptions: SyncOptions = {}) {
 
       if (!existingLink.is_active) {
         console.log(`✅ Re-activating chapter link: ${row.fullName}`)
-
         if (!finalOptions.dryRun) {
           await prisma.member_chapter.update({
             where: { id: existingLink.id },
             data: { is_active: true },
           })
         }
-
         stats.reactivated++
       }
     } else if (member.id > 0) {
       console.log(`🔗 Linking member to ${chapter.name}: ${row.fullName}`)
-
       if (!finalOptions.dryRun) {
         const newLink = await prisma.member_chapter.create({
           data: {
@@ -213,10 +202,8 @@ export async function runShrinathjiRosterSync(syncOptions: SyncOptions = {}) {
             is_active: true,
           },
         })
-
         touchedLinkIds.add(newLink.id)
       }
-
       stats.linked++
     }
   }
@@ -227,25 +214,21 @@ export async function runShrinathjiRosterSync(syncOptions: SyncOptions = {}) {
       if (!link.is_active) continue
 
       const hasCoordinatorOrLeadershipRole = link.roles.length > 0
-
       if (finalOptions.protectRoleLinks && hasCoordinatorOrLeadershipRole) {
         console.warn(
           `🛡️ Skipping non-PPT member because the chapter link has roles: ${link.member.full_name}`,
         )
-
         stats.protectedRoleLinks++
         continue
       }
 
       console.log(`🚫 Deactivating non-PPT chapter link: ${link.member.full_name}`)
-
       if (!finalOptions.dryRun) {
         await prisma.member_chapter.update({
           where: { id: link.id },
           data: { is_active: false },
         })
       }
-
       stats.deactivated++
     }
   }

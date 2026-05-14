@@ -15,13 +15,7 @@ export class PublicController {
         name: true,
         city: true,
         member_links: {
-          where: {
-            is_active: true,
-            member: { is_active: true },
-          },
-          orderBy: {
-            member: { full_name: 'asc' },
-          },
+          where: { is_active: true },
           select: {
             member: {
               select: {
@@ -32,6 +26,7 @@ export class PublicController {
                 category: true,
                 industry: true,
                 email: true,
+                phone: true, // ✅ added this
                 profile: {
                   select: {
                     photo_url: true,
